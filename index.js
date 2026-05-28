@@ -8,16 +8,80 @@ const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: true });
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
 const MINI_APP_URL = process.env.MINI_APP_URL;
-const ADMIN_TELEGRAM_ID = process.env.ADMIN_TELEGRAM_ID;
+const ADMIN_ID = process.env.ADMIN_TELEGRAM_ID;
 
-// ── Save subscriber when they start the bot ───────────────────────────────────
+// ── Jouw logo URL — upload naar imgur.com en vervang deze link ────────────────
+const LOGO_URL = process.env.LOGO_URL || 'https://i.imgur.com/JOUWLOGO.jpg';
+
+// ── Info tekst ────────────────────────────────────────────────────────────────
+const INFO_TEXT = `
+╔════════════════════════╗
+        ✦ MFF LAVOURS ✦
+╚════════════════════════╝
+
+🏆 *Maroc's Finest Flavours*
+_Premium Quality • Fast • Discreet_
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+📦 *PICKUP*
+📍 Utrecht, Netherlands
+🕐 Mon – Sun  |  19:00 – 22:00
+⚠️ Min. order: *€500*
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+🚚 *SHIPPING*
+🌍 Same day shipping across Europe
+📦 Premium stealth packaging
+⚠️ Min. order: *€250*
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+💳 *PAYMENT*
+₿  Bitcoin \\(BTC\\)
+💎  Tether \\(USDT\\)
+💵  Cash on pickup
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+⚡ _Fast • Stealth • Trusted_
+`.trim();
+
+const WELCOME_TEXT = (name) => `
+👋 *Welcome to MFFlavours, ${name}\\!*
+
+🔥 Maroc's Finest Flavours
+_Premium quality — straight from the source_
+
+Tap below to browse our full selection\\.
+`.trim();
+
+// ── Main keyboard buttons ─────────────────────────────────────────────────────
+const MAIN_KEYBOARD = {
+  inline_keyboard: [
+    [
+      { text: 'ℹ️ Info', callback_data: 'info' },
+      { text: '📞 Contact', callback_data: 'contact' },
+    ],
+    [
+      { text: '🛍️ Open Menu', web_app: { url: MINI_APP_URL } }
+    ]
+  ]
+};
+
+// ── Save subscriber ───────────────────────────────────────────────────────────
 async function saveSubscriber(msg) {
   const { id, username, first_name } = msg.from;
-  await supabase.from('subscribers').upsert({
-    telegram_id: id,
-    username: username || null,
-    first_name: first_name || null,
-  }, { onConflict: 'telegram_id' });
+  try {
+    await supabase.from('subscribers').upsert({
+      telegram_id: id,
+      username: username || null,
+      first_name: first_name || null,
+    }, { onConflict: 'telegram_id' });
+  } catch (e) {
+    console.error('Save subscriber error:', e.message);
+  }
 }
 
 // ── /start ────────────────────────────────────────────────────────────────────
@@ -27,50 +91,130 @@ bot.onText(/\/start/, async (msg) => {
 
   await saveSubscriber(msg);
 
-  await bot.sendMessage(chatId,
-    `🔥 *Welcome to MFFlavours, ${firstName}!*\n\nFast • Stealth • Trusted\n\n_Browse our full menu via the button below._`,
-    {
-      parse_mode: 'Markdown',
-      reply_markup: {
-        inline_keyboard: [[{ text: '🛍️ Open Menu', web_app: { url: MINI_APP_URL } }]]
-      }
-    }
-  );
+  try {
+    await bot.sendPhoto(chatId, LOGO_URL, {
+      caption: WELCOME_TEXT(firstName),
+      parse_mode: 'MarkdownV2',
+      reply_markup: MAIN_KEYBOARD,
+    });
+  } catch (e) {
+    // Fallback zonder foto als URL niet werkt
+    await bot.sendMessage(chatId, WELCOME_TEXT(firstName), {
+      parse_mode: 'MarkdownV2',
+      reply_markup: MAIN_KEYBOARD,
+    });
+  }
 });
 
 // ── /menu ─────────────────────────────────────────────────────────────────────
 bot.onText(/\/menu/, async (msg) => {
   await saveSubscriber(msg);
-  await bot.sendMessage(msg.chat.id, '🛍️ Open the MFFlavours menu:', {
+  await bot.sendMessage(msg.chat.id, '🛍️ *MFFlavours Menu*\n\nTap below to browse our selection:', {
+    parse_mode: 'Markdown',
     reply_markup: {
-      keyboard: [[{ text: '🛍️ Open Menu', web_app: { url: MINI_APP_URL } }]],
-      resize_keyboard: true
+      inline_keyboard: [[{ text: '🛍️ Open Menu', web_app: { url: MINI_APP_URL } }]]
+    }
+  });
+});
+
+// ── /info ─────────────────────────────────────────────────────────────────────
+bot.onText(/\/info/, async (msg) => {
+  await bot.sendMessage(msg.chat.id, INFO_TEXT, {
+    parse_mode: 'MarkdownV2',
+    reply_markup: {
+      inline_keyboard: [[{ text: '🛍️ Open Menu', web_app: { url: MINI_APP_URL } }]]
     }
   });
 });
 
 // ── /help ─────────────────────────────────────────────────────────────────────
 bot.onText(/\/help/, async (msg) => {
-  await bot.sendMessage(msg.chat.id,
-    `*MFFlavours — How it works:*\n\n1️⃣ Tap *Open Menu* to browse\n2️⃣ Pick your products & sizes\n3️⃣ Contact us via Telegram or Signal\n\n📦 Discreet packaging\n💬 Questions? Just message us!`,
-    { parse_mode: 'Markdown' }
-  );
+  await bot.sendMessage(msg.chat.id, WELCOME_TEXT(msg.from.first_name || 'there'), {
+    parse_mode: 'MarkdownV2',
+    reply_markup: MAIN_KEYBOARD,
+  });
 });
 
-// ── /admin — owner only ───────────────────────────────────────────────────────
-bot.onText(/\/admin/, async (msg) => {
-  if (String(msg.from.id) !== String(ADMIN_TELEGRAM_ID)) {
-    return bot.sendMessage(msg.chat.id, '⛔ Access denied.');
+// ── Callback buttons (Info & Contact) ─────────────────────────────────────────
+bot.on('callback_query', async (query) => {
+  const chatId = query.message.chat.id;
+  const data = query.data;
+
+  await bot.answerCallbackQuery(query.id);
+
+  if (data === 'info') {
+    await bot.sendMessage(chatId, INFO_TEXT, {
+      parse_mode: 'MarkdownV2',
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🛍️ Open Menu', web_app: { url: MINI_APP_URL } }],
+          [{ text: '◀️ Back', callback_data: 'back' }]
+        ]
+      }
+    });
   }
 
-  const { count } = await supabase
-    .from('subscribers')
-    .select('*', { count: 'exact', head: true });
+  if (data === 'contact') {
+    const tgUrl = process.env.TELEGRAM_CONTACT_URL || 'https://t.me/MFFlavours';
+    const sigUrl = process.env.SIGNAL_URL || 'https://signal.me';
+
+    await bot.sendMessage(chatId,
+      `📞 *Contact MFFlavours*\n\n_We reply fast — usually within minutes\\._\n\n✈️ *Telegram:* [Chat with us](${tgUrl})\n🔵 *Signal:* [Chat with us](${sigUrl})\n\n⏰ Available: Mon–Sun | 19:00–22:00`.replace(/[.!]/g, '\\$&'),
+      {
+        parse_mode: 'MarkdownV2',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '✈️ Telegram', url: tgUrl },
+              { text: '🔵 Signal', url: sigUrl },
+            ],
+            [{ text: '◀️ Back', callback_data: 'back' }]
+          ]
+        }
+      }
+    );
+  }
+
+  if (data === 'back') {
+    await bot.sendMessage(chatId, '🏠 *MFFlavours*', {
+      parse_mode: 'Markdown',
+      reply_markup: MAIN_KEYBOARD,
+    });
+  }
+
+  // Admin order confirm/decline
+  if (data.startsWith('confirm_') || data.startsWith('decline_')) {
+    if (String(query.from.id) !== String(ADMIN_ID)) return;
+    const [action, orderId, customerChatId] = data.split('_');
+    if (action === 'confirm') {
+      await supabase.from('orders').update({ status: 'confirmed' }).eq('id', orderId);
+      await bot.sendMessage(customerChatId, '✅ *Your order has been confirmed\\!*\nWe\'ll contact you shortly\\.', { parse_mode: 'MarkdownV2' });
+      await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: query.message.chat.id, message_id: query.message.message_id });
+    }
+    if (action === 'decline') {
+      await supabase.from('orders').update({ status: 'declined' }).eq('id', orderId);
+      await bot.sendMessage(customerChatId, '❌ *Order could not be processed\\.*\nPlease contact us directly\\.', { parse_mode: 'MarkdownV2' });
+      await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: query.message.chat.id, message_id: query.message.message_id });
+    }
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  ADMIN COMMANDS — alleen jij kan deze gebruiken
+// ═══════════════════════════════════════════════════════════════
+
+function isAdmin(msg) { return String(msg.from.id) === String(ADMIN_ID); }
+
+// ── /admin ────────────────────────────────────────────────────────────────────
+bot.onText(/\/admin/, async (msg) => {
+  if (!isAdmin(msg)) return bot.sendMessage(msg.chat.id, '⛔ Access denied.');
+
+  const { count } = await supabase.from('subscribers').select('*', { count: 'exact', head: true });
 
   await bot.sendMessage(msg.chat.id,
-    `🔐 *Admin Panel*\n\n👥 Subscribers: ${count || 0}\n\nCommands:\n/broadcast \\[message\\] — Send to everyone\n/stats — View subscriber count`,
+    `🔐 *MFFlavours Admin*\n\n👥 Subscribers: *${count || 0}*\n\n*Commands:*\n/broadcast tekst — Stuur naar iedereen\n/broadcastphoto — Stuur foto naar iedereen\n/subscribers — Zie alle subscribers\n/stats — Statistieken\n/setlogo URL — Update welkomstfoto`,
     {
-      parse_mode: 'MarkdownV2',
+      parse_mode: 'Markdown',
       reply_markup: {
         inline_keyboard: [[{ text: '⚙️ Open Admin Panel', url: process.env.ADMIN_URL }]]
       }
@@ -80,42 +224,49 @@ bot.onText(/\/admin/, async (msg) => {
 
 // ── /stats ────────────────────────────────────────────────────────────────────
 bot.onText(/\/stats/, async (msg) => {
-  if (String(msg.from.id) !== String(ADMIN_TELEGRAM_ID)) return;
-
-  const { count } = await supabase
-    .from('subscribers')
-    .select('*', { count: 'exact', head: true });
-
-  await bot.sendMessage(msg.chat.id, `👥 Total subscribers: *${count || 0}*`, { parse_mode: 'Markdown' });
+  if (!isAdmin(msg)) return;
+  const { count } = await supabase.from('subscribers').select('*', { count: 'exact', head: true });
+  await bot.sendMessage(msg.chat.id, `📊 *Stats*\n\n👥 Subscribers: *${count || 0}*`, { parse_mode: 'Markdown' });
 });
 
-// ── /broadcast [message] — send to all subscribers ───────────────────────────
-bot.onText(/\/broadcast (.+)/, async (msg, match) => {
-  if (String(msg.from.id) !== String(ADMIN_TELEGRAM_ID)) {
-    return bot.sendMessage(msg.chat.id, '⛔ Access denied.');
-  }
+// ── /subscribers ──────────────────────────────────────────────────────────────
+bot.onText(/\/subscribers/, async (msg) => {
+  if (!isAdmin(msg)) return;
 
-  const message = match[1];
-  if (!message) return bot.sendMessage(msg.chat.id, 'Usage: /broadcast Your message here');
-
-  // Get all subscribers
-  const { data: subscribers, error } = await supabase
+  const { data: subs } = await supabase
     .from('subscribers')
-    .select('telegram_id');
+    .select('telegram_id, username, first_name, joined_at')
+    .order('joined_at', { ascending: false })
+    .limit(50);
 
-  if (error || !subscribers?.length) {
-    return bot.sendMessage(msg.chat.id, '❌ No subscribers found.');
-  }
+  if (!subs?.length) return bot.sendMessage(msg.chat.id, 'Nog geen subscribers.');
 
-  await bot.sendMessage(msg.chat.id, `📤 Sending to ${subscribers.length} subscribers...`);
+  const list = subs.map((s, i) => {
+    const name = s.username ? `@${s.username}` : s.first_name || 'Unknown';
+    return `${i + 1}. ${name} (${s.telegram_id})`;
+  }).join('\n');
 
-  let sent = 0;
-  let failed = 0;
+  await bot.sendMessage(msg.chat.id,
+    `👥 *Subscribers (${subs.length}):*\n\n${list}`,
+    { parse_mode: 'Markdown' }
+  );
+});
 
-  for (const sub of subscribers) {
+// ── /broadcast [tekst] ────────────────────────────────────────────────────────
+bot.onText(/\/broadcast (.+)/, async (msg, match) => {
+  if (!isAdmin(msg)) return;
+
+  const text = match[1];
+  const { data: subs } = await supabase.from('subscribers').select('telegram_id');
+  if (!subs?.length) return bot.sendMessage(msg.chat.id, '❌ Geen subscribers.');
+
+  await bot.sendMessage(msg.chat.id, `📤 Bezig met sturen naar ${subs.length} subscribers...`);
+
+  let sent = 0, failed = 0;
+  for (const sub of subs) {
     try {
       await bot.sendMessage(sub.telegram_id,
-        `📢 *MFFlavours*\n\n${message}`,
+        `📢 *MFFlavours*\n\n${text}`,
         {
           parse_mode: 'Markdown',
           reply_markup: {
@@ -124,40 +275,36 @@ bot.onText(/\/broadcast (.+)/, async (msg, match) => {
         }
       );
       sent++;
-      // Small delay to avoid Telegram rate limits
-      await new Promise(r => setTimeout(r, 50));
-    } catch (e) {
-      failed++;
-      console.log(`Failed to send to ${sub.telegram_id}:`, e.message);
-    }
+      await new Promise(r => setTimeout(r, 60));
+    } catch (e) { failed++; }
   }
 
-  await bot.sendMessage(msg.chat.id,
-    `✅ Broadcast done!\n\n✓ Sent: ${sent}\n✗ Failed: ${failed}`
-  );
+  await bot.sendMessage(msg.chat.id, `✅ Klaar\\!\n\n✓ Verstuurd: ${sent}\n✗ Mislukt: ${failed}`, { parse_mode: 'MarkdownV2' });
 });
 
-// ── /broadcastmedia — send photo or video to all ─────────────────────────────
+// ── /broadcastphoto — stuur foto naar iedereen ────────────────────────────────
 bot.onText(/\/broadcastphoto/, async (msg) => {
-  if (String(msg.from.id) !== String(ADMIN_TELEGRAM_ID)) return;
+  if (!isAdmin(msg)) return;
   await bot.sendMessage(msg.chat.id,
-    '📸 Reply to this message with a photo or video to broadcast it to all subscribers.\n\nOr use:\n/broadcast Your text message here'
+    '📸 Stuur nu een foto naar deze chat met je tekst als caption\\.\n\nVoorbeeld caption:\n`Nieuwe batch binnen 🔥`',
+    { parse_mode: 'MarkdownV2' }
   );
 });
 
-// Handle photo replies for broadcast
+// Handle foto van admin — stuur naar alle subscribers
 bot.on('photo', async (msg) => {
-  if (String(msg.from.id) !== String(ADMIN_TELEGRAM_ID)) return;
-  if (!msg.caption?.startsWith('/send')) return;
+  if (!isAdmin(msg)) return;
 
-  const caption = msg.caption.replace('/send', '').trim();
+  const caption = msg.caption || '';
   const photo = msg.photo[msg.photo.length - 1].file_id;
 
-  const { data: subscribers } = await supabase.from('subscribers').select('telegram_id');
-  if (!subscribers?.length) return bot.sendMessage(msg.chat.id, 'No subscribers.');
+  const { data: subs } = await supabase.from('subscribers').select('telegram_id');
+  if (!subs?.length) return bot.sendMessage(msg.chat.id, 'Geen subscribers.');
 
-  let sent = 0;
-  for (const sub of subscribers) {
+  await bot.sendMessage(msg.chat.id, `📤 Foto sturen naar ${subs.length} subscribers...`);
+
+  let sent = 0, failed = 0;
+  for (const sub of subs) {
     try {
       await bot.sendPhoto(sub.telegram_id, photo, {
         caption: caption ? `📢 *MFFlavours*\n\n${caption}` : '📢 *MFFlavours*',
@@ -167,10 +314,39 @@ bot.on('photo', async (msg) => {
         }
       });
       sent++;
-      await new Promise(r => setTimeout(r, 50));
-    } catch (e) { console.log(`Failed:`, e.message); }
+      await new Promise(r => setTimeout(r, 60));
+    } catch (e) { failed++; }
   }
-  await bot.sendMessage(msg.chat.id, `✅ Photo sent to ${sent} subscribers!`);
+  await bot.sendMessage(msg.chat.id, `✅ Foto verstuurd naar ${sent} subscribers!`);
+});
+
+// ── Handle video van admin — stuur naar alle subscribers ──────────────────────
+bot.on('video', async (msg) => {
+  if (!isAdmin(msg)) return;
+
+  const caption = msg.caption || '';
+  const video = msg.video.file_id;
+
+  const { data: subs } = await supabase.from('subscribers').select('telegram_id');
+  if (!subs?.length) return bot.sendMessage(msg.chat.id, 'Geen subscribers.');
+
+  await bot.sendMessage(msg.chat.id, `📤 Video sturen naar ${subs.length} subscribers...`);
+
+  let sent = 0, failed = 0;
+  for (const sub of subs) {
+    try {
+      await bot.sendVideo(sub.telegram_id, video, {
+        caption: caption ? `📢 *MFFlavours*\n\n${caption}` : '📢 *MFFlavours*',
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [[{ text: '🛍️ Open Menu', web_app: { url: MINI_APP_URL } }]]
+        }
+      });
+      sent++;
+      await new Promise(r => setTimeout(r, 60));
+    } catch (e) { failed++; }
+  }
+  await bot.sendMessage(msg.chat.id, `✅ Video verstuurd naar ${sent} subscribers!`);
 });
 
 // Express health check
