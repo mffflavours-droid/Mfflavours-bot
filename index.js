@@ -140,7 +140,7 @@ bot.on('callback_query', async (query) => {
 
   if (query.data === 'contact') {
     await bot.sendMessage(chatId,
-      `📞 *Contact MFFlavours*\n\nWe reageren snel — meestal binnen enkele minuten.\n\n✈️ Telegram: ${TG_CONTACT}\n🔵 Signal: ${SIG_CONTACT}\n\n🕐 Beschikbaar: Ma–Zo | 24/7`,
+      `📞 *Contact MFFlavours*\n\nWe reageren snel — meestal binnen enkele minuten.\n\n✈️ Telegram: ${TG_CONTACT}\n🔵 Signal: ${SIG_CONTACT}\n\n🕐 Beschikbaar: Ma–Zo | 19:00–22:00`,
       {
         parse_mode: 'Markdown',
         reply_markup: {
