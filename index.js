@@ -165,8 +165,8 @@ bot.onText(/\/admin/, async (msg) => {
   try {
     const { count } = await supabase.from('subscribers').select('*', { count: 'exact', head: true });
     await safeSend(() => bot.sendMessage(msg.chat.id,
-      `Admin Panel\n\nSubscribers: ${count || 0}\n\nCommands:\n/broadcast [text] - Send to everyone\n/subscribers - List all subscribers\n/stats - Subscriber count\n\nBroadcast media: just send a photo or video to this chat.`,
-      { reply_markup: { inline_keyboard: [[{ text: 'Open Admin Panel', url: ADMIN_URL }]] } }
+      `🔐 Admin Panel\n\n👥 Subscribers: ${count || 0}\n\nCommands:\n/broadcast [text] — Send to everyone\n/subscribers — List all subscribers\n/stats — Subscriber count\n\n📸 Broadcast media: just send a photo or video to this chat.`,
+      { reply_markup: { inline_keyboard: [[{ text: '⚙️ Open Admin Panel', url: ADMIN_URL }]] } }
     ));
   } catch (e) { console.log('/admin error:', e.message); }
 });
@@ -202,28 +202,48 @@ bot.onText(/\/subscribers/, async (msg) => {
 });
 
 // ── /broadcast [text] ─────────────────────────────────────────────────────────
-bot.onText(/\/broadcast (.+)/, async (msg, match) => {
+bot.on('message', async (msg) => {
   if (!isAdmin(msg)) return;
-  const text = match[1]?.trim();
-  if (!text) return safeSend(() => bot.sendMessage(msg.chat.id, 'Usage: /broadcast Your message here'));
+  const text = msg.text || '';
+
+  // Match /broadcast with or without bot username
+  const match = text.match(/^\/broadcast(?:@\S+)?\s+(.+)/s);
+  if (!match) return;
+
+  const broadcastText = match[1].trim();
+  if (!broadcastText) return safeSend(() => bot.sendMessage(msg.chat.id, 'Usage: /broadcast Your message here'));
 
   try {
-    const subs = await getSubscribers();
-    if (!subs.length) return safeSend(() => bot.sendMessage(msg.chat.id, 'No subscribers found.'));
+    const { data: subs, error } = await supabase.from('subscribers').select('telegram_id');
+
+    if (error) {
+      console.log('Supabase error fetching subscribers:', error.message);
+      return safeSend(() => bot.sendMessage(msg.chat.id, 'Error fetching subscribers: ' + error.message));
+    }
+
+    if (!subs || subs.length === 0) {
+      return safeSend(() => bot.sendMessage(msg.chat.id, 'No subscribers found. People need to send /start to the bot first.'));
+    }
 
     await safeSend(() => bot.sendMessage(msg.chat.id, `Sending to ${subs.length} subscribers...`));
 
     let sent = 0, failed = 0;
     for (const sub of subs) {
       try {
-        await bot.sendMessage(sub.telegram_id, `MFFlavours\n\n${text}`, { reply_markup: MENU_BUTTON });
+        await bot.sendMessage(sub.telegram_id, `📢 MFFlavours\n\n${broadcastText}`, { reply_markup: MENU_BUTTON });
         sent++;
-      } catch (_) { failed++; }
+      } catch (e) {
+        failed++;
+        console.log(`Failed to send to ${sub.telegram_id}:`, e.message);
+      }
       await new Promise(r => setTimeout(r, 60));
     }
 
-    await safeSend(() => bot.sendMessage(msg.chat.id, `Broadcast complete!\n\nSent: ${sent}\nFailed: ${failed}`));
-  } catch (e) { console.log('/broadcast error:', e.message); }
+    await safeSend(() => bot.sendMessage(msg.chat.id, `✅ Broadcast complete!\n\nSent: ${sent}\nFailed: ${failed}`));
+  } catch (e) {
+    console.log('/broadcast error:', e.message);
+    await safeSend(() => bot.sendMessage(msg.chat.id, 'Broadcast failed: ' + e.message));
+  }
 });
 
 // ── Photo from admin → broadcast ─────────────────────────────────────────────
