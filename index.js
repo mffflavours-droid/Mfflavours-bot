@@ -17,38 +17,38 @@ const SIG_CONTACT  = process.env.SIGNAL_URL || 'https://signal.me';
 
 // ── Static texts — no Markdown, no special chars ──────────────────────────────
 const INFO_TEXT = [
-  'MFFlavours — Info',
+  'ℹ️ MFFlavours — Info',
   '',
-  'PICKUP',
-  'Location: Utrecht, Netherlands',
-  'Hours: Mon - Sun  |  19:00 - 22:00',
-  'Min order: 500 EUR',
+  '📦 PICKUP',
+  '📍 Location: Utrecht, Netherlands',
+  '🕐 Hours: Mon - Sun  |  19:00 - 22:00',
+  '⚠️ Min order: 500 EUR',
   '',
-  'SHIPPING',
-  'Same day shipping across Europe',
-  'Premium stealth packaging',
-  'Min order: 250 EUR',
+  '🚚 SHIPPING',
+  '🌍 Same day shipping across Europe',
+  '📦 Premium stealth packaging',
+  '⚠️ Min order: 250 EUR',
   '',
-  'PAYMENT',
-  'Bitcoin (BTC)',
-  'Tether (USDT)',
-  'Cash on pickup',
+  '💳 PAYMENT',
+  '₿ Bitcoin (BTC)',
+  '💎 Tether (USDT)',
+  '💵 Cash on pickup',
   '',
-  'Fast - Stealth - Trusted',
+  '⚡ Fast - Stealth - Trusted',
 ].join('\n');
 
 const MAIN_KEYBOARD = {
   inline_keyboard: [
     [
-      { text: 'Info',    callback_data: 'info'    },
-      { text: 'Contact', callback_data: 'contact' },
+      { text: 'ℹ️ Info',    callback_data: 'info'    },
+      { text: '📞 Contact', callback_data: 'contact' },
     ],
-    [{ text: 'Open Menu', web_app: { url: MINI_APP_URL } }]
+    [{ text: '🛍️ Open Menu', web_app: { url: MINI_APP_URL } }]
   ]
 };
 
 const MENU_BUTTON = {
-  inline_keyboard: [[{ text: 'Open Menu', web_app: { url: MINI_APP_URL } }]]
+  inline_keyboard: [[{ text: '🛍️ Open Menu', web_app: { url: MINI_APP_URL } }]]
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -121,8 +121,8 @@ bot.on('callback_query', async (query) => {
     await safeSend(() => bot.sendMessage(chatId, INFO_TEXT, {
       reply_markup: {
         inline_keyboard: [
-          [{ text: 'Open Menu', web_app: { url: MINI_APP_URL } }],
-          [{ text: 'Back', callback_data: 'back' }]
+          [{ text: '🛍️ Open Menu', web_app: { url: MINI_APP_URL } }],
+          [{ text: '◀️ Back', callback_data: 'back' }]
         ]
       }
     }));
@@ -130,15 +130,15 @@ bot.on('callback_query', async (query) => {
 
   if (query.data === 'contact') {
     await safeSend(() => bot.sendMessage(chatId,
-      'Contact MFFlavours\n\nSend us a message anytime — we are available 24/7.',
+      '📞 Contact MFFlavours\n\nSend us a message anytime — we are available 24/7.',
       {
         reply_markup: {
           inline_keyboard: [
             [
-              { text: 'Telegram', url: TG_CONTACT },
-              { text: 'Signal',   url: SIG_CONTACT },
+              { text: '✈️ Telegram', url: TG_CONTACT },
+              { text: '🔵 Signal',   url: SIG_CONTACT },
             ],
-            [{ text: 'Back', callback_data: 'back' }]
+            [{ text: '◀️ Back', callback_data: 'back' }]
           ]
         }
       }
@@ -146,7 +146,7 @@ bot.on('callback_query', async (query) => {
   }
 
   if (query.data === 'back') {
-    await safeSend(() => bot.sendMessage(chatId, 'MFFlavours', { reply_markup: MAIN_KEYBOARD }));
+    await safeSend(() => bot.sendMessage(chatId, '🏠 MFFlavours', { reply_markup: MAIN_KEYBOARD }));
   }
 });
 
